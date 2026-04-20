@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Menorca Cash</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a1a1a">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg: #1a1a1a; --card: #262626; --text: #f0f0f0;
+            --blue: #3498db; --orange: #e67e22; --grey: #95a5a6;
+            --purple: #9b59b6; --red: #e74c3c; --green: #2ecc71;
+            --yellow: #f1c40f;
+        }
+        * { -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+        input { -webkit-user-select: auto; user-select: auto; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 12px; overflow-x: hidden; }
+        
+        .dashboard { background: var(--card); padding: 15px; border-radius: 15px; text-align: center; margin-bottom: 15px; border-bottom: 3px solid var(--green); cursor: pointer; }
+        .app-name { font-size: 0.8em; letter-spacing: 2px; color: var(--grey); text-transform: uppercase; margin-bottom: 5px; }
+        .balance { font-size: 2.2em; font-weight: bold; margin: 5px 0; color: var(--green); }
+        .section-title { font-size: 0.75em; color: #888; text-transform: uppercase; margin: 18px 0 8px 5px; letter-spacing: 1px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .btn { background: var(--card); border: none; color: white; padding: 16px; border-radius: 12px; font-size: 0.9em; text-align: left; transition: 0.2s; border-left: 3px solid transparent; }
+        .btn:active { background: #333; transform: scale(0.96); }
+        .l-diario { border-left-color: var(--blue); } .l-online { border-left-color: var(--orange); }
+        .l-motor { border-left-color: var(--grey); } .l-familia { border-left-color: var(--red); }
+        .l-niños { border-left-color: var(--yellow); } .l-fijos { border-left-color: var(--purple); }
+        .l-ayto { border-left-color: #7f8c8d; }
+        input#monto { width: 100%; box-sizing: border-box; background: transparent; border: none; border-bottom: 2px solid #333; color: white; font-size: 2.2em; text-align: center; padding: 10px; margin-bottom: 10px; outline: none; }
+        .analysis-container { background: var(--card); border-radius: 15px; padding: 15px; margin-top: 20px; display: flex; flex-direction: column; align-items: center; }
+        .chart-box { max-width: 110px; }
+
+        /* PANTALLAS (HISTORIAL Y CONFIG) */
+        .full-screen { position: fixed; top: 0; left: 100%; width: 100%; height: 100%; background: var(--bg); transition: 0.3s ease; z-index: 100; padding: 20px; box-sizing: border-box; overflow-y: auto; }
+        .full-screen.active { left: 0; }
+        .header-alt { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .btn-back { background: var(--card); border: none; color: white; padding: 10px 15px; border-radius: 10px; }
+
+        .config-input { width: 100%; background: var(--card); border: 1px solid #444; color: white; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-size: 1em; }
+        .btn-save { width: 100%; background: var(--green); color: black; border: none; padding: 15px; border-radius: 10px; font-weight: bold; margin-top: 10px; }
+        
+        table { width: 100%; border-collapse: collapse; }
+        td { padding: 15px 0; border-bottom: 1px solid #333; }
+        .hist-monto { text-align: right; font-weight: bold; color: var(--red); }
+
+        .nav-btns { position: fixed; bottom: 20px; right: 20px; display: flex; gap: 10px; z-index: 90; }
+        .btn-round { background: var(--green); color: black; border: none; width: 50px; height: 50px; border-radius: 25px; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .btn-config { background: var(--grey); }
+
+        .firma { position: fixed; bottom: 10px; left: 15px; font-size: 0.5em; color: #1e1e1e; pointer-events: none; letter-spacing: 1px; }
+    </style>
+</head>
+<body>
+
+    <div id="pantalla-principal">
+        <div class="dashboard" onclick="abrirHistorial()">
+            <div class="app-name">Menorca Cash</div>
+            <div class="balance" id="total">0,00 €</div>
+            <div style="font-size: 0.6em; color: var(--grey);">DISPONIBLE REAL</div>
+        </div>
+
+        <input type="number" id="monto" placeholder="0.00" inputmode="decimal">
+
+        <div class="section-title">Día a día y Caprichos</div>
+        <div class="grid">
+            <button class="btn l-diario" onclick="addGasto('☕ Diario', 0)">☕ Diario</button>
+            <button class="btn l-online" onclick="addGasto('📦 Online', 1)">📦 Capricho</button>
+        </div>
+
+        <div class="section-title">Vehículos</div>
+        <div class="grid">
+            <button class="btn l-motor" onclick="addGasto('⛽ Gasolina', 2)">⛽ Gasolina</button>
+            <button class="btn l-motor" onclick="addGasto('🔧 Mecánico', 2)">🔧 Mecánico</button>
+        </div>
+
+        <div class="section-title">Familia y Hogar</div>
+        <div class="grid">
+            <button class="btn l-familia" onclick="addGasto('💸 Ayuda Ext.', 3)">💸 Ayuda Ext.</button>
+            <button class="btn l-niños" onclick="addGasto('👦 Niños', 4)">👦 Niños</button>
+        </div>
+
+        <div class="section-title">Recibos y Ayto.</div>
+        <div class="grid">
+            <button class="btn l-fijos" onclick="addGasto('📡 Tlf / Net', 5)">📡 Tlf / Net</button>
+            <button class="btn l-ayto" onclick="addGasto('🏛️ Ayto', 6)">🏛️ Ayto / IBI</button>
+        </div>
+
+        <div class="section-title">CONCEPTOS SEMANAL</div>
+        <div class="analysis-container">
+            <div class="chart-box"><canvas id="myChart"></canvas></div>
+        </div>
+    </div>
+
+    <div id="pantalla-historial" class="full-screen">
+        <div class="header-alt">
+            <div style="font-weight: bold;">HISTORIAL</div>
+            <button class="btn-back" onclick="cerrarPantallas()">VOLVER</button>
+        </div>
+        <table id="lista-gastos"><tbody></tbody></table>
+    </div>
+
+    <div id="pantalla-config" class="full-screen">
+        <div class="header-alt">
+            <div style="font-weight: bold;">MI SUELDO Y FIJOS</div>
+            <button class="btn-back" onclick="cerrarPantallas()">VOLVER</button>
+        </div>
+        <p style="font-size: 0.8em; color: #888;">Configura tu mes aquí:</p>
+        <label style="font-size: 0.7em;">SUELDO MENSUAL (€)</label>
+        <input type="number" id="input-sueldo" class="config-input" placeholder="Ej: 1500">
+        
+        <label style="font-size: 0.7em;">TOTAL GASTOS FIJS / CRÉDITOS (€)</label>
+        <input type="number" id="input-fijos" class="config-input" placeholder="Ej: 600">
+        
+        <button class="btn-save" onclick="iniciarNuevoMes()">🔄 REINICIAR MES (COBRAR)</button>
+        <p style="font-size: 0.6em; color: #555; margin-top: 10px;">Esto cargará tu sueldo y restará los fijos automáticamente.</p>
+    </div>
+
+    <div class="nav-btns">
+        <button class="btn-round btn-config" onclick="abrirConfig()">⚙️</button>
+        <button class="btn-round" onclick="abrirHistorial()">🕒</button>
+    </div>
+    
+    <div class="firma">MEDBASHA</div>
+
+    <script>
+        if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js'); }
+
+        let balance = parseFloat(localStorage.getItem('balance_mb')) || 0;
+        let datosGrafico = JSON.parse(localStorage.getItem('grafico_mb')) || [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1];
+        let historial = JSON.parse(localStorage.getItem('historial_mb')) || [];
+
+        const ctx = document.getElementById('myChart').getContext('2d');
+        let myChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Diario', 'Online', 'Motor', 'Familia', 'Niños', 'Fijos', 'Ayto'],
+                datasets: [{ data: datosGrafico, backgroundColor: ['#3498db', '#e67e22', '#95a5a6', '#e74c3c', '#f1c40f', '#9b59b6', '#7f8c8d'], borderWidth: 0 }]
+            },
+            options: { cutout: '80%', plugins: { legend: { display: false } } }
+        });
+
+        function renderApp() {
+            document.getElementById('total').innerText = balance.toLocaleString('es-ES', {minimumFractionDigits: 2}) + " €";
+            const tbody = document.getElementById('lista-gastos').getElementsByTagName('tbody')[0];
+            tbody.innerHTML = "";
+            historial.forEach((item, i) => {
+                const fila = tbody.insertRow();
+                fila.onclick = () => { if(confirm("¿Borrar?")) borrarGasto(i); };
+                fila.innerHTML = `<td>${item.concepto}</td><td class="hist-monto">-${item.monto.toFixed(2)} €</td>`;
+            });
+            myChart.update();
+        }
+
+        function addGasto(concepto, index) {
+            const mInput = document.getElementById('monto');
+            const monto = parseFloat(mInput.value);
+            if (isNaN(monto) || monto <= 0) return;
+            balance -= monto;
+            if(datosGrafico[index] === 0.1) datosGrafico[index] = 0;
+            datosGrafico[index] += monto;
+            historial.unshift({concepto, monto, catIndex: index});
+            guardarYRefrescar();
+            mInput.value = "";
+        }
+
+        function borrarGasto(i) {
+            const item = historial[i];
+            balance += item.monto;
+            datosGrafico[item.catIndex] -= item.monto;
+            if(datosGrafico[item.catIndex] <= 0) datosGrafico[item.catIndex] = 0.1;
+            historial.splice(i, 1);
+            guardarYRefrescar();
+        }
+
+        function iniciarNuevoMes() {
+            const s = parseFloat(document.getElementById('input-sueldo').value) || 0;
+            const f = parseFloat(document.getElementById('input-fijos').value) || 0;
+            if (s <= 0) return alert("Pon tu sueldo");
+            
+            if(confirm(`Se cargará un sueldo de ${s}€ y se restarán ${f}€ de fijos. ¿Continuar?`)) {
+                balance = s - f;
+                historial = [{concepto: "💰 Sueldo - Fijos", monto: f, catIndex: 5}]; // Se registra como gasto fijo inicial
+                datosGrafico = [0.1, 0.1, 0.1, 0.1, 0.1, f, 0.1];
+                localStorage.setItem('conf_sueldo', s);
+                localStorage.setItem('conf_fijos', f);
+                guardarYRefrescar();
+                cerrarPantallas();
+            }
+        }
+
+        function guardarYRefrescar() {
+            localStorage.setItem('balance_mb', balance);
+            localStorage.setItem('grafico_mb', JSON.stringify(datosGrafico));
+            localStorage.setItem('historial_mb', JSON.stringify(historial));
+            renderApp();
+        }
+
+        function abrirHistorial() { document.getElementById('pantalla-historial').classList.add('active'); }
+        function abrirConfig() { 
+            document.getElementById('pantalla-config').classList.add('active'); 
+            document.getElementById('input-sueldo').value = localStorage.getItem('conf_sueldo') || "";
+            document.getElementById('input-fijos').value = localStorage.getItem('conf_fijos') || "";
+        }
+        function cerrarPantallas() { 
+            document.getElementById('pantalla-historial').classList.remove('active'); 
+            document.getElementById('pantalla-config').classList.remove('active'); 
+        }
+
+        renderApp();
+    </script>
+</body>
+</html>
